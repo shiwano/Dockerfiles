@@ -11,6 +11,9 @@ RUN apk update \
   && apk add bash \
   && apk add sudo \
   && apk add shadow \
+  && apk add coreutils \
+  && apk add findutils \
+  && apk add make \
   && apk add curl \
   && apk add tar \
   && apk add gzip \
