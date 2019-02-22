@@ -1,10 +1,11 @@
-FROM shiwano/buildpack-deps
+FROM shiwano/alpine:latest
 
 USER root
 
-RUN apt-get update \
-  && apt-get install -y clang-format
+RUN apk update \
+  && apk add clang \
+  && rm -rf /var/cache/apk/*
 
-USER builder
+USER user
+
 ENTRYPOINT ["clang-format"]
-CMD ["--help"]
