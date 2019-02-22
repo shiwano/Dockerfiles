@@ -19,4 +19,5 @@ RUN groupadd --gid 3434 builder \
   && echo 'Defaults    env_keep += "DEBIAN_FRONTEND"' >> /etc/sudoers.d/env_keep
 
 USER builder
+WORKDIR /home/builder
 CMD ["/bin/sh"]
