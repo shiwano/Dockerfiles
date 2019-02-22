@@ -7,6 +7,7 @@ RUN apk update \
   && mkdir -p /usr/share/man/man1 \
   && apk add git \
   && apk add ca-certificates \
+  && apk add openssh \
   && apk add bash \
   && apk add sudo \
   && apk add shadow \
