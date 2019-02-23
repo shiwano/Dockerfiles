@@ -139,12 +139,8 @@ RUN mkdir -p ${OUTDIR}/usr/bin && \
         install -c /rust-protobuf/target/x86_64-unknown-linux-musl/release/protoc-gen-rust ${OUTDIR}/usr/bin/
 
 
-FROM znly/upx as packer
-COPY --from=protoc_builder /out/ /out/
-RUN upx --lzma \
-        /out/usr/bin/protoc \
-        /out/usr/bin/grpc_* \
-        /out/usr/bin/protoc-gen-*
+FROM alpine:3.7 as clang_format_builder
+RUN apk update && apk add --no-cache clang
 
 
 FROM alpine:3.7 as node_builder
@@ -165,38 +161,45 @@ RUN npm set progress=false && \
     npm install ts-protoc-gen@${TS_PROTOC_GEN_VERSION}
 
 
-FROM alpine:3.7
-RUN apk add --no-cache libstdc++
+FROM znly/upx as packer
+COPY --from=protoc_builder /out/ /out/
+COPY --from=clang_format_builder /usr/bin/clang-format /out/usr/bin/clang-format
+RUN upx --lzma \
+        /out/usr/bin/protoc \
+        /out/usr/bin/clang-format \
+        /out/usr/bin/grpc_* \
+        /out/usr/bin/protoc-gen-*
+
+
+FROM shiwano/alpine:latest
+USER root
+RUN apk add --no-cache libstdc++ libc6-compat nodejs
 COPY --from=packer /out/ /
 COPY --from=rust_builder /out/ /
 COPY --from=swift_builder /protoc-gen-swift /protoc-gen-swift
-RUN for p in protoc-gen-swift protoc-gen-swiftgrpc; do \
-        ln -s /protoc-gen-swift/${p} /usr/bin/${p}; \
-        done
 COPY --from=javalite_builder /protoc-gen-javalite /protoc-gen-javalite
 COPY --from=node_builder /node_modules /node_modules
+RUN for p in protoc-gen-swift protoc-gen-swiftgrpc; do \
+      ln -s /protoc-gen-swift/${p} /usr/bin/${p}; \
+    done
 RUN ln -s /protoc-gen-javalite/protoc-gen-javalite /usr/bin/protoc-gen-javalite
 RUN ln -s /node_modules/ts-protoc-gen/bin/protoc-gen-ts /usr/bin/protoc-gen-ts
-
-RUN apk add --no-cache curl nodejs libc6-compat && \
-        mkdir -p /protobuf/google/protobuf && \
-        for f in any duration descriptor empty struct timestamp wrappers; do \
-        curl -L -o /protobuf/google/protobuf/${f}.proto https://raw.githubusercontent.com/google/protobuf/master/src/google/protobuf/${f}.proto; \
-        done && \
-        mkdir -p /protobuf/google/api && \
-        for f in annotations http; do \
-        curl -L -o /protobuf/google/api/${f}.proto https://raw.githubusercontent.com/grpc-ecosystem/grpc-gateway/master/third_party/googleapis/google/api/${f}.proto; \
-        done && \
-        mkdir -p /protobuf/github.com/gogo/protobuf/gogoproto && \
-        curl -L -o /protobuf/github.com/gogo/protobuf/gogoproto/gogo.proto https://raw.githubusercontent.com/gogo/protobuf/master/gogoproto/gogo.proto && \
-        mkdir -p /protobuf/github.com/mwitkow/go-proto-validators && \
-        curl -L -o /protobuf/github.com/mwitkow/go-proto-validators/validator.proto https://raw.githubusercontent.com/mwitkow/go-proto-validators/master/validator.proto && \
-        mkdir -p /protobuf/github.com/lyft/protoc-gen-validate/gogoproto && \
-        mkdir -p /protobuf/github.com/lyft/protoc-gen-validate/validate && \
-        curl -L -o /protobuf/github.com/lyft/protoc-gen-validate/gogoproto/gogo.proto https://raw.githubusercontent.com/lyft/protoc-gen-validate/master/gogoproto/gogo.proto && \
-        curl -L -o /protobuf/github.com/lyft/protoc-gen-validate/validate/validate.proto https://raw.githubusercontent.com/lyft/protoc-gen-validate/master/validate/validate.proto && \
-        apk del curl && \
-        npm uninstall -g npm && \
-        chmod a+x /usr/bin/protoc
-
+RUN mkdir -p /protobuf/google/protobuf && \
+    for f in any duration descriptor empty struct timestamp wrappers; do \
+    curl -L -o /protobuf/google/protobuf/${f}.proto https://raw.githubusercontent.com/google/protobuf/master/src/google/protobuf/${f}.proto; \
+    done && \
+    mkdir -p /protobuf/google/api && \
+    for f in annotations http; do \
+    curl -L -o /protobuf/google/api/${f}.proto https://raw.githubusercontent.com/grpc-ecosystem/grpc-gateway/master/third_party/googleapis/google/api/${f}.proto; \
+    done && \
+    mkdir -p /protobuf/github.com/gogo/protobuf/gogoproto && \
+    curl -L -o /protobuf/github.com/gogo/protobuf/gogoproto/gogo.proto https://raw.githubusercontent.com/gogo/protobuf/master/gogoproto/gogo.proto && \
+    mkdir -p /protobuf/github.com/mwitkow/go-proto-validators && \
+    curl -L -o /protobuf/github.com/mwitkow/go-proto-validators/validator.proto https://raw.githubusercontent.com/mwitkow/go-proto-validators/master/validator.proto && \
+    mkdir -p /protobuf/github.com/lyft/protoc-gen-validate/gogoproto && \
+    mkdir -p /protobuf/github.com/lyft/protoc-gen-validate/validate && \
+    curl -L -o /protobuf/github.com/lyft/protoc-gen-validate/gogoproto/gogo.proto https://raw.githubusercontent.com/lyft/protoc-gen-validate/master/gogoproto/gogo.proto && \
+    curl -L -o /protobuf/github.com/lyft/protoc-gen-validate/validate/validate.proto https://raw.githubusercontent.com/lyft/protoc-gen-validate/master/validate/validate.proto && \
+    chmod a+x /usr/bin/protoc
+USER user
 ENTRYPOINT ["/usr/bin/protoc", "-I/protobuf"]
