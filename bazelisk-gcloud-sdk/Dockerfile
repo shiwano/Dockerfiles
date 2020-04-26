@@ -1,4 +1,4 @@
-FROM google/cloud-sdk:287.0.0
+FROM google/cloud-sdk:287.0.0-slim
 
 RUN curl -L -o bazelisk https://github.com/bazelbuild/bazelisk/releases/download/v1.3.0/bazelisk-linux-amd64 \
       && chmod +x ./bazelisk \
